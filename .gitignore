@@ -18,3 +18,9 @@ venv/
 
 # Node
 node_modules/
+
+# text 
+cricket.txt 
+
+# pdf 
+dl-curriculum.pdf
