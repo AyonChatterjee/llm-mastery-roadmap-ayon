@@ -4,6 +4,9 @@ __pycache__/
 .venv/
 venv/
 
+#Chroma notebook
+chroma.ipynb 
+
 # Environment files
 .env
 
@@ -24,3 +27,6 @@ cricket.txt
 
 # pdf 
 dl-curriculum.pdf
+
+# vector store
+my_chroma_db

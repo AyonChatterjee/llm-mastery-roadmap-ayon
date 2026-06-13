@@ -1,0 +1,836 @@
+diff --git a/.gitignore b/.gitignore
+index 8a18663..44afef2 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -4,6 +4,9 @@ __pycache__/
+ .venv/
+ venv/
+ 
++#Chroma notebook
++chroma.ipynb 
++
+ # Environment files
+ .env
+ 
+@@ -23,4 +26,7 @@ node_modules/
+ cricket.txt 
+ 
+ # pdf 
+-dl-curriculum.pdf
+\ No newline at end of file
++dl-curriculum.pdf
++
++# vector store
++my_chroma_db
+\ No newline at end of file
+diff --git a/Langchain/RAG/Vector_Stores/chroma.ipynb b/Langchain/RAG/Vector_Stores/chroma.ipynb
+new file mode 100644
+index 0000000..3d451c2
+--- /dev/null
++++ b/Langchain/RAG/Vector_Stores/chroma.ipynb
+@@ -0,0 +1,768 @@
++{
++ "cells": [
++  {
++   "cell_type": "code",
++   "execution_count": 4,
++   "id": "bdc641f4",
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "from dotenv import load_dotenv\n",
++    "import os \n",
++    "\n",
++    "load_dotenv()\n",
++    "\n",
++    "hf_token = os.getenv(\"HF_TOKEN\")"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 5,
++   "id": "43a35e9f",
++   "metadata": {},
++   "outputs": [
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "Requirement already satisfied: langchain in /opt/anaconda3/lib/python3.13/site-packages (1.0.2)\n",
++      "Requirement already satisfied: chromadb in /opt/anaconda3/lib/python3.13/site-packages (1.5.9)\n",
++      "Requirement already satisfied: openai in /opt/anaconda3/lib/python3.13/site-packages (2.6.0)\n",
++      "Requirement already satisfied: tiktoken in /opt/anaconda3/lib/python3.13/site-packages (0.12.0)\n",
++      "Requirement already satisfied: pypdf in /opt/anaconda3/lib/python3.13/site-packages (6.13.2)\n",
++      "Requirement already satisfied: langchain_openai in /opt/anaconda3/lib/python3.13/site-packages (1.0.1)\n",
++      "Requirement already satisfied: langchain-community in /opt/anaconda3/lib/python3.13/site-packages (0.4.2)\n",
++      "Requirement already satisfied: langchain-core<2.0.0,>=1.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain) (1.4.3)\n",
++      "Requirement already satisfied: langgraph<1.1.0,>=1.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain) (1.0.1)\n",
++      "Requirement already satisfied: pydantic<3.0.0,>=2.7.4 in /opt/anaconda3/lib/python3.13/site-packages (from langchain) (2.12.3)\n",
++      "Requirement already satisfied: jsonpatch<2.0.0,>=1.33.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (1.33)\n",
++      "Requirement already satisfied: langchain-protocol>=0.0.14 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (0.0.16)\n",
++      "Requirement already satisfied: langsmith<1.0.0,>=0.3.45 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (0.3.45)\n",
++      "Requirement already satisfied: packaging>=23.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (24.2)\n",
++      "Requirement already satisfied: pyyaml<7.0.0,>=5.3.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (6.0.3)\n",
++      "Requirement already satisfied: tenacity!=8.4.0,<10.0.0,>=8.1.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (9.0.0)\n",
++      "Requirement already satisfied: typing-extensions<5.0.0,>=4.7.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (4.15.0)\n",
++      "Requirement already satisfied: uuid-utils<1.0,>=0.12.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (0.16.0)\n",
++      "Requirement already satisfied: jsonpointer>=1.9 in /opt/anaconda3/lib/python3.13/site-packages (from jsonpatch<2.0.0,>=1.33.0->langchain-core<2.0.0,>=1.0.0->langchain) (2.1)\n",
++      "Requirement already satisfied: langgraph-checkpoint<4.0.0,>=2.1.0 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph<1.1.0,>=1.0.0->langchain) (3.0.0)\n",
++      "Requirement already satisfied: langgraph-prebuilt<1.1.0,>=1.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph<1.1.0,>=1.0.0->langchain) (1.0.1)\n",
++      "Requirement already satisfied: langgraph-sdk<0.3.0,>=0.2.2 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph<1.1.0,>=1.0.0->langchain) (0.2.9)\n",
++      "Requirement already satisfied: xxhash>=3.5.0 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph<1.1.0,>=1.0.0->langchain) (3.6.0)\n",
++      "Requirement already satisfied: ormsgpack>=1.10.0 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph-checkpoint<4.0.0,>=2.1.0->langgraph<1.1.0,>=1.0.0->langchain) (1.11.0)\n",
++      "Requirement already satisfied: httpx>=0.25.2 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (0.28.1)\n",
++      "Requirement already satisfied: orjson>=3.10.1 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (3.11.3)\n",
++      "Requirement already satisfied: requests<3,>=2 in /opt/anaconda3/lib/python3.13/site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.0.0->langchain) (2.34.2)\n",
++      "Requirement already satisfied: requests-toolbelt<2.0.0,>=1.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.0.0->langchain) (1.0.0)\n",
++      "Requirement already satisfied: zstandard<0.24.0,>=0.23.0 in /opt/anaconda3/lib/python3.13/site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.0.0->langchain) (0.23.0)\n",
++      "Requirement already satisfied: anyio in /opt/anaconda3/lib/python3.13/site-packages (from httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (4.7.0)\n",
++      "Requirement already satisfied: certifi in /opt/anaconda3/lib/python3.13/site-packages (from httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (2025.10.5)\n",
++      "Requirement already satisfied: httpcore==1.* in /opt/anaconda3/lib/python3.13/site-packages (from httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (1.0.9)\n",
++      "Requirement already satisfied: idna in /opt/anaconda3/lib/python3.13/site-packages (from httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (3.7)\n",
++      "Requirement already satisfied: h11>=0.16 in /opt/anaconda3/lib/python3.13/site-packages (from httpcore==1.*->httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (0.16.0)\n",
++      "Requirement already satisfied: annotated-types>=0.6.0 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic<3.0.0,>=2.7.4->langchain) (0.6.0)\n",
++      "Requirement already satisfied: pydantic-core==2.41.4 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic<3.0.0,>=2.7.4->langchain) (2.41.4)\n",
++      "Requirement already satisfied: typing-inspection>=0.4.2 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic<3.0.0,>=2.7.4->langchain) (0.4.2)\n",
++      "Requirement already satisfied: charset_normalizer<4,>=2 in /opt/anaconda3/lib/python3.13/site-packages (from requests<3,>=2->langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.0.0->langchain) (3.3.2)\n",
++      "Requirement already satisfied: urllib3<3,>=1.26 in /opt/anaconda3/lib/python3.13/site-packages (from requests<3,>=2->langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.0.0->langchain) (2.3.0)\n",
++      "Requirement already satisfied: build>=1.0.3 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.5.0)\n",
++      "Requirement already satisfied: pydantic-settings>=2.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (2.11.0)\n",
++      "Requirement already satisfied: pybase64>=1.4.1 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.4.3)\n",
++      "Requirement already satisfied: uvicorn>=0.18.3 in /opt/anaconda3/lib/python3.13/site-packages (from uvicorn[standard]>=0.18.3->chromadb) (0.37.0)\n",
++      "Requirement already satisfied: numpy>=1.22.5 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (2.2.6)\n",
++      "Requirement already satisfied: onnxruntime>=1.14.1 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.26.0)\n",
++      "Requirement already satisfied: opentelemetry-api>=1.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.42.1)\n",
++      "Requirement already satisfied: opentelemetry-exporter-otlp-proto-grpc>=1.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.42.1)\n",
++      "Requirement already satisfied: opentelemetry-sdk>=1.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.42.1)\n",
++      "Requirement already satisfied: tokenizers>=0.13.2 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (0.22.2)\n",
++      "Requirement already satisfied: pypika>=0.48.9 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (0.51.1)\n",
++      "Requirement already satisfied: tqdm>=4.65.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (4.67.1)\n",
++      "Requirement already satisfied: overrides>=7.3.1 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (7.4.0)\n",
++      "Requirement already satisfied: importlib-resources in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (7.1.0)\n",
++      "Requirement already satisfied: grpcio>=1.58.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.81.0)\n",
++      "Requirement already satisfied: bcrypt>=4.0.1 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (4.3.0)\n",
++      "Requirement already satisfied: typer>=0.9.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (0.25.1)\n",
++      "Requirement already satisfied: kubernetes>=28.1.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (36.0.2)\n",
++      "Requirement already satisfied: mmh3>=4.0.1 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (5.2.1)\n",
++      "Requirement already satisfied: rich>=10.11.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (13.9.4)\n",
++      "Requirement already satisfied: jsonschema>=4.19.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (4.23.0)\n",
++      "Requirement already satisfied: distro<2,>=1.7.0 in /opt/anaconda3/lib/python3.13/site-packages (from openai) (1.9.0)\n",
++      "Requirement already satisfied: jiter<1,>=0.10.0 in /opt/anaconda3/lib/python3.13/site-packages (from openai) (0.11.1)\n",
++      "Requirement already satisfied: sniffio in /opt/anaconda3/lib/python3.13/site-packages (from openai) (1.3.0)\n",
++      "Requirement already satisfied: regex>=2022.1.18 in /opt/anaconda3/lib/python3.13/site-packages (from tiktoken) (2025.10.23)\n",
++      "Requirement already satisfied: aiohttp<4.0.0,>=3.8.3 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-community) (3.14.1)\n",
++      "Requirement already satisfied: httpx-sse<1.0.0,>=0.4.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-community) (0.4.3)\n",
++      "Requirement already satisfied: langchain-classic<2.0.0,>=1.0.7 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-community) (1.0.7)\n",
++      "Requirement already satisfied: sqlalchemy<3.0.0,>=1.4.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-community) (2.0.39)\n",
++      "Requirement already satisfied: aiohappyeyeballs>=2.5.0 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.8.3->langchain-community) (2.6.2)\n",
++      "Requirement already satisfied: aiosignal>=1.4.0 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.8.3->langchain-community) (1.4.0)\n",
++      "Requirement already satisfied: attrs>=17.3.0 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.8.3->langchain-community) (24.3.0)\n",
++      "Requirement already satisfied: frozenlist>=1.1.1 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.8.3->langchain-community) (1.5.0)\n",
++      "Requirement already satisfied: multidict<7.0,>=4.5 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.8.3->langchain-community) (6.1.0)\n",
++      "Requirement already satisfied: propcache>=0.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.8.3->langchain-community) (0.3.1)\n",
++      "Requirement already satisfied: yarl<2.0,>=1.17.0 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.8.3->langchain-community) (1.18.0)\n",
++      "Requirement already satisfied: langchain-text-splitters<2.0.0,>=1.1.2 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-classic<2.0.0,>=1.0.7->langchain-community) (1.1.2)\n",
++      "Requirement already satisfied: python-dotenv>=0.21.0 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic-settings>=2.0->chromadb) (1.1.0)\n",
++      "Requirement already satisfied: pyproject_hooks in /opt/anaconda3/lib/python3.13/site-packages (from build>=1.0.3->chromadb) (1.2.0)\n",
++      "Requirement already satisfied: jsonschema-specifications>=2023.03.6 in /opt/anaconda3/lib/python3.13/site-packages (from jsonschema>=4.19.0->chromadb) (2023.7.1)\n",
++      "Requirement already satisfied: referencing>=0.28.4 in /opt/anaconda3/lib/python3.13/site-packages (from jsonschema>=4.19.0->chromadb) (0.30.2)\n",
++      "Requirement already satisfied: rpds-py>=0.7.1 in /opt/anaconda3/lib/python3.13/site-packages (from jsonschema>=4.19.0->chromadb) (0.22.3)\n",
++      "Requirement already satisfied: six>=1.9.0 in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (1.17.0)\n",
++      "Requirement already satisfied: python-dateutil>=2.5.3 in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (2.9.0.post0)\n",
++      "Requirement already satisfied: websocket-client!=0.40.0,!=0.41.*,!=0.42.*,>=0.32.0 in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (1.8.0)\n",
++      "Requirement already satisfied: requests-oauthlib in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (2.0.0)\n",
++      "Requirement already satisfied: durationpy>=0.7 in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (0.10)\n",
++      "Requirement already satisfied: flatbuffers in /opt/anaconda3/lib/python3.13/site-packages (from onnxruntime>=1.14.1->chromadb) (25.12.19)\n",
++      "Requirement already satisfied: protobuf in /opt/anaconda3/lib/python3.13/site-packages (from onnxruntime>=1.14.1->chromadb) (5.29.3)\n",
++      "Requirement already satisfied: googleapis-common-protos~=1.57 in /opt/anaconda3/lib/python3.13/site-packages (from opentelemetry-exporter-otlp-proto-grpc>=1.2.0->chromadb) (1.75.0)\n",
++      "Requirement already satisfied: opentelemetry-exporter-otlp-proto-common==1.42.1 in /opt/anaconda3/lib/python3.13/site-packages (from opentelemetry-exporter-otlp-proto-grpc>=1.2.0->chromadb) (1.42.1)\n",
++      "Requirement already satisfied: opentelemetry-proto==1.42.1 in /opt/anaconda3/lib/python3.13/site-packages (from opentelemetry-exporter-otlp-proto-grpc>=1.2.0->chromadb) (1.42.1)\n",
++      "Requirement already satisfied: opentelemetry-semantic-conventions==0.63b1 in /opt/anaconda3/lib/python3.13/site-packages (from opentelemetry-sdk>=1.2.0->chromadb) (0.63b1)\n",
++      "Requirement already satisfied: markdown-it-py>=2.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from rich>=10.11.0->chromadb) (2.2.0)\n",
++      "Requirement already satisfied: pygments<3.0.0,>=2.13.0 in /opt/anaconda3/lib/python3.13/site-packages (from rich>=10.11.0->chromadb) (2.19.1)\n",
++      "Requirement already satisfied: mdurl~=0.1 in /opt/anaconda3/lib/python3.13/site-packages (from markdown-it-py>=2.2.0->rich>=10.11.0->chromadb) (0.1.0)\n",
++      "Requirement already satisfied: huggingface-hub<2.0,>=0.16.4 in /opt/anaconda3/lib/python3.13/site-packages (from tokenizers>=0.13.2->chromadb) (1.18.0)\n",
++      "Requirement already satisfied: click>=8.4.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.13.2->chromadb) (8.4.1)\n",
++      "Requirement already satisfied: filelock>=3.10.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.13.2->chromadb) (3.17.0)\n",
++      "Requirement already satisfied: fsspec>=2023.5.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.13.2->chromadb) (2025.3.2)\n",
++      "Requirement already satisfied: hf-xet<2.0.0,>=1.4.3 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.13.2->chromadb) (1.5.1)\n",
++      "Requirement already satisfied: shellingham>=1.3.0 in /opt/anaconda3/lib/python3.13/site-packages (from typer>=0.9.0->chromadb) (1.5.0)\n",
++      "Requirement already satisfied: annotated-doc>=0.0.2 in /opt/anaconda3/lib/python3.13/site-packages (from typer>=0.9.0->chromadb) (0.0.4)\n",
++      "Requirement already satisfied: httptools>=0.6.3 in /opt/anaconda3/lib/python3.13/site-packages (from uvicorn[standard]>=0.18.3->chromadb) (0.7.1)\n",
++      "Requirement already satisfied: uvloop>=0.15.1 in /opt/anaconda3/lib/python3.13/site-packages (from uvicorn[standard]>=0.18.3->chromadb) (0.22.1)\n",
++      "Requirement already satisfied: watchfiles>=0.13 in /opt/anaconda3/lib/python3.13/site-packages (from uvicorn[standard]>=0.18.3->chromadb) (1.1.1)\n",
++      "Requirement already satisfied: websockets>=10.4 in /opt/anaconda3/lib/python3.13/site-packages (from uvicorn[standard]>=0.18.3->chromadb) (15.0.1)\n",
++      "Requirement already satisfied: oauthlib>=3.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from requests-oauthlib->kubernetes>=28.1.0->chromadb) (3.3.1)\n",
++      "\n",
++      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m A new release of pip is available: \u001b[0m\u001b[31;49m25.3\u001b[0m\u001b[39;49m -> \u001b[0m\u001b[32;49m26.1.2\u001b[0m\n",
++      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m To update, run: \u001b[0m\u001b[32;49mpip install --upgrade pip\u001b[0m\n"
++     ]
++    }
++   ],
++   "source": [
++    "!pip install langchain chromadb openai tiktoken pypdf langchain_openai langchain-community"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 6,
++   "id": "6e12cd9b",
++   "metadata": {},
++   "outputs": [
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "Requirement already satisfied: langchain_huggingface in /opt/anaconda3/lib/python3.13/site-packages (1.2.2)\n",
++      "Requirement already satisfied: huggingface-hub<2.0.0,>=0.33.4 in /opt/anaconda3/lib/python3.13/site-packages (from langchain_huggingface) (1.18.0)\n",
++      "Requirement already satisfied: langchain-core<2.0.0,>=1.2.31 in /opt/anaconda3/lib/python3.13/site-packages (from langchain_huggingface) (1.4.3)\n",
++      "Requirement already satisfied: tokenizers<1.0.0,>=0.19.1 in /opt/anaconda3/lib/python3.13/site-packages (from langchain_huggingface) (0.22.2)\n",
++      "Requirement already satisfied: click>=8.4.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (8.4.1)\n",
++      "Requirement already satisfied: filelock>=3.10.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (3.17.0)\n",
++      "Requirement already satisfied: fsspec>=2023.5.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (2025.3.2)\n",
++      "Requirement already satisfied: hf-xet<2.0.0,>=1.4.3 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (1.5.1)\n",
++      "Requirement already satisfied: httpx<1,>=0.23.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (0.28.1)\n",
++      "Requirement already satisfied: packaging>=20.9 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (24.2)\n",
++      "Requirement already satisfied: pyyaml>=5.1 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (6.0.3)\n",
++      "Requirement already satisfied: tqdm>=4.42.1 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (4.67.1)\n",
++      "Requirement already satisfied: typer<0.26.0,>=0.20.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (0.25.1)\n",
++      "Requirement already satisfied: typing-extensions>=4.1.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (4.15.0)\n",
++      "Requirement already satisfied: anyio in /opt/anaconda3/lib/python3.13/site-packages (from httpx<1,>=0.23.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (4.7.0)\n",
++      "Requirement already satisfied: certifi in /opt/anaconda3/lib/python3.13/site-packages (from httpx<1,>=0.23.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (2025.10.5)\n",
++      "Requirement already satisfied: httpcore==1.* in /opt/anaconda3/lib/python3.13/site-packages (from httpx<1,>=0.23.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (1.0.9)\n",
++      "Requirement already satisfied: idna in /opt/anaconda3/lib/python3.13/site-packages (from httpx<1,>=0.23.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (3.7)\n",
++      "Requirement already satisfied: h11>=0.16 in /opt/anaconda3/lib/python3.13/site-packages (from httpcore==1.*->httpx<1,>=0.23.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (0.16.0)\n",
++      "Requirement already satisfied: jsonpatch<2.0.0,>=1.33.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (1.33)\n",
++      "Requirement already satisfied: langchain-protocol>=0.0.14 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (0.0.16)\n",
++      "Requirement already satisfied: langsmith<1.0.0,>=0.3.45 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (0.3.45)\n",
++      "Requirement already satisfied: pydantic<3.0.0,>=2.7.4 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (2.12.3)\n",
++      "Requirement already satisfied: tenacity!=8.4.0,<10.0.0,>=8.1.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (9.0.0)\n",
++      "Requirement already satisfied: uuid-utils<1.0,>=0.12.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (0.16.0)\n",
++      "Requirement already satisfied: jsonpointer>=1.9 in /opt/anaconda3/lib/python3.13/site-packages (from jsonpatch<2.0.0,>=1.33.0->langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (2.1)\n",
++      "Requirement already satisfied: orjson<4.0.0,>=3.9.14 in /opt/anaconda3/lib/python3.13/site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (3.11.3)\n",
++      "Requirement already satisfied: requests<3,>=2 in /opt/anaconda3/lib/python3.13/site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (2.34.2)\n",
++      "Requirement already satisfied: requests-toolbelt<2.0.0,>=1.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (1.0.0)\n",
++      "Requirement already satisfied: zstandard<0.24.0,>=0.23.0 in /opt/anaconda3/lib/python3.13/site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (0.23.0)\n",
++      "Requirement already satisfied: annotated-types>=0.6.0 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic<3.0.0,>=2.7.4->langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (0.6.0)\n",
++      "Requirement already satisfied: pydantic-core==2.41.4 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic<3.0.0,>=2.7.4->langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (2.41.4)\n",
++      "Requirement already satisfied: typing-inspection>=0.4.2 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic<3.0.0,>=2.7.4->langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (0.4.2)\n",
++      "Requirement already satisfied: charset_normalizer<4,>=2 in /opt/anaconda3/lib/python3.13/site-packages (from requests<3,>=2->langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (3.3.2)\n",
++      "Requirement already satisfied: urllib3<3,>=1.26 in /opt/anaconda3/lib/python3.13/site-packages (from requests<3,>=2->langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.2.31->langchain_huggingface) (2.3.0)\n",
++      "Requirement already satisfied: shellingham>=1.3.0 in /opt/anaconda3/lib/python3.13/site-packages (from typer<0.26.0,>=0.20.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (1.5.0)\n",
++      "Requirement already satisfied: rich>=13.8.0 in /opt/anaconda3/lib/python3.13/site-packages (from typer<0.26.0,>=0.20.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (13.9.4)\n",
++      "Requirement already satisfied: annotated-doc>=0.0.2 in /opt/anaconda3/lib/python3.13/site-packages (from typer<0.26.0,>=0.20.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (0.0.4)\n",
++      "Requirement already satisfied: markdown-it-py>=2.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from rich>=13.8.0->typer<0.26.0,>=0.20.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (2.2.0)\n",
++      "Requirement already satisfied: pygments<3.0.0,>=2.13.0 in /opt/anaconda3/lib/python3.13/site-packages (from rich>=13.8.0->typer<0.26.0,>=0.20.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (2.19.1)\n",
++      "Requirement already satisfied: mdurl~=0.1 in /opt/anaconda3/lib/python3.13/site-packages (from markdown-it-py>=2.2.0->rich>=13.8.0->typer<0.26.0,>=0.20.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (0.1.0)\n",
++      "Requirement already satisfied: sniffio>=1.1 in /opt/anaconda3/lib/python3.13/site-packages (from anyio->httpx<1,>=0.23.0->huggingface-hub<2.0.0,>=0.33.4->langchain_huggingface) (1.3.0)\n",
++      "\n",
++      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m A new release of pip is available: \u001b[0m\u001b[31;49m25.3\u001b[0m\u001b[39;49m -> \u001b[0m\u001b[32;49m26.1.2\u001b[0m\n",
++      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m To update, run: \u001b[0m\u001b[32;49mpip install --upgrade pip\u001b[0m\n",
++      "Note: you may need to restart the kernel to use updated packages.\n"
++     ]
++    }
++   ],
++   "source": [
++    "pip install langchain_huggingface\n"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 7,
++   "id": "7960fd52",
++   "metadata": {},
++   "outputs": [
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "Requirement already satisfied: langchain in /opt/anaconda3/lib/python3.13/site-packages (1.0.2)\n",
++      "Requirement already satisfied: chromadb in /opt/anaconda3/lib/python3.13/site-packages (1.5.9)\n",
++      "Requirement already satisfied: langchain-core<2.0.0,>=1.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain) (1.4.3)\n",
++      "Requirement already satisfied: langgraph<1.1.0,>=1.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain) (1.0.1)\n",
++      "Requirement already satisfied: pydantic<3.0.0,>=2.7.4 in /opt/anaconda3/lib/python3.13/site-packages (from langchain) (2.12.3)\n",
++      "Requirement already satisfied: jsonpatch<2.0.0,>=1.33.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (1.33)\n",
++      "Requirement already satisfied: langchain-protocol>=0.0.14 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (0.0.16)\n",
++      "Requirement already satisfied: langsmith<1.0.0,>=0.3.45 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (0.3.45)\n",
++      "Requirement already satisfied: packaging>=23.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (24.2)\n",
++      "Requirement already satisfied: pyyaml<7.0.0,>=5.3.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (6.0.3)\n",
++      "Requirement already satisfied: tenacity!=8.4.0,<10.0.0,>=8.1.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (9.0.0)\n",
++      "Requirement already satisfied: typing-extensions<5.0.0,>=4.7.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (4.15.0)\n",
++      "Requirement already satisfied: uuid-utils<1.0,>=0.12.0 in /opt/anaconda3/lib/python3.13/site-packages (from langchain-core<2.0.0,>=1.0.0->langchain) (0.16.0)\n",
++      "Requirement already satisfied: jsonpointer>=1.9 in /opt/anaconda3/lib/python3.13/site-packages (from jsonpatch<2.0.0,>=1.33.0->langchain-core<2.0.0,>=1.0.0->langchain) (2.1)\n",
++      "Requirement already satisfied: langgraph-checkpoint<4.0.0,>=2.1.0 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph<1.1.0,>=1.0.0->langchain) (3.0.0)\n",
++      "Requirement already satisfied: langgraph-prebuilt<1.1.0,>=1.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph<1.1.0,>=1.0.0->langchain) (1.0.1)\n",
++      "Requirement already satisfied: langgraph-sdk<0.3.0,>=0.2.2 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph<1.1.0,>=1.0.0->langchain) (0.2.9)\n",
++      "Requirement already satisfied: xxhash>=3.5.0 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph<1.1.0,>=1.0.0->langchain) (3.6.0)\n",
++      "Requirement already satisfied: ormsgpack>=1.10.0 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph-checkpoint<4.0.0,>=2.1.0->langgraph<1.1.0,>=1.0.0->langchain) (1.11.0)\n",
++      "Requirement already satisfied: httpx>=0.25.2 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (0.28.1)\n",
++      "Requirement already satisfied: orjson>=3.10.1 in /opt/anaconda3/lib/python3.13/site-packages (from langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (3.11.3)\n",
++      "Requirement already satisfied: requests<3,>=2 in /opt/anaconda3/lib/python3.13/site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.0.0->langchain) (2.34.2)\n",
++      "Requirement already satisfied: requests-toolbelt<2.0.0,>=1.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.0.0->langchain) (1.0.0)\n",
++      "Requirement already satisfied: zstandard<0.24.0,>=0.23.0 in /opt/anaconda3/lib/python3.13/site-packages (from langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.0.0->langchain) (0.23.0)\n",
++      "Requirement already satisfied: anyio in /opt/anaconda3/lib/python3.13/site-packages (from httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (4.7.0)\n",
++      "Requirement already satisfied: certifi in /opt/anaconda3/lib/python3.13/site-packages (from httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (2025.10.5)\n",
++      "Requirement already satisfied: httpcore==1.* in /opt/anaconda3/lib/python3.13/site-packages (from httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (1.0.9)\n",
++      "Requirement already satisfied: idna in /opt/anaconda3/lib/python3.13/site-packages (from httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (3.7)\n",
++      "Requirement already satisfied: h11>=0.16 in /opt/anaconda3/lib/python3.13/site-packages (from httpcore==1.*->httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (0.16.0)\n",
++      "Requirement already satisfied: annotated-types>=0.6.0 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic<3.0.0,>=2.7.4->langchain) (0.6.0)\n",
++      "Requirement already satisfied: pydantic-core==2.41.4 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic<3.0.0,>=2.7.4->langchain) (2.41.4)\n",
++      "Requirement already satisfied: typing-inspection>=0.4.2 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic<3.0.0,>=2.7.4->langchain) (0.4.2)\n",
++      "Requirement already satisfied: charset_normalizer<4,>=2 in /opt/anaconda3/lib/python3.13/site-packages (from requests<3,>=2->langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.0.0->langchain) (3.3.2)\n",
++      "Requirement already satisfied: urllib3<3,>=1.26 in /opt/anaconda3/lib/python3.13/site-packages (from requests<3,>=2->langsmith<1.0.0,>=0.3.45->langchain-core<2.0.0,>=1.0.0->langchain) (2.3.0)\n",
++      "Requirement already satisfied: build>=1.0.3 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.5.0)\n",
++      "Requirement already satisfied: pydantic-settings>=2.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (2.11.0)\n",
++      "Requirement already satisfied: pybase64>=1.4.1 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.4.3)\n",
++      "Requirement already satisfied: uvicorn>=0.18.3 in /opt/anaconda3/lib/python3.13/site-packages (from uvicorn[standard]>=0.18.3->chromadb) (0.37.0)\n",
++      "Requirement already satisfied: numpy>=1.22.5 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (2.2.6)\n",
++      "Requirement already satisfied: onnxruntime>=1.14.1 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.26.0)\n",
++      "Requirement already satisfied: opentelemetry-api>=1.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.42.1)\n",
++      "Requirement already satisfied: opentelemetry-exporter-otlp-proto-grpc>=1.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.42.1)\n",
++      "Requirement already satisfied: opentelemetry-sdk>=1.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.42.1)\n",
++      "Requirement already satisfied: tokenizers>=0.13.2 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (0.22.2)\n",
++      "Requirement already satisfied: pypika>=0.48.9 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (0.51.1)\n",
++      "Requirement already satisfied: tqdm>=4.65.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (4.67.1)\n",
++      "Requirement already satisfied: overrides>=7.3.1 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (7.4.0)\n",
++      "Requirement already satisfied: importlib-resources in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (7.1.0)\n",
++      "Requirement already satisfied: grpcio>=1.58.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (1.81.0)\n",
++      "Requirement already satisfied: bcrypt>=4.0.1 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (4.3.0)\n",
++      "Requirement already satisfied: typer>=0.9.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (0.25.1)\n",
++      "Requirement already satisfied: kubernetes>=28.1.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (36.0.2)\n",
++      "Requirement already satisfied: mmh3>=4.0.1 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (5.2.1)\n",
++      "Requirement already satisfied: rich>=10.11.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (13.9.4)\n",
++      "Requirement already satisfied: jsonschema>=4.19.0 in /opt/anaconda3/lib/python3.13/site-packages (from chromadb) (4.23.0)\n",
++      "Requirement already satisfied: pyproject_hooks in /opt/anaconda3/lib/python3.13/site-packages (from build>=1.0.3->chromadb) (1.2.0)\n",
++      "Requirement already satisfied: attrs>=22.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from jsonschema>=4.19.0->chromadb) (24.3.0)\n",
++      "Requirement already satisfied: jsonschema-specifications>=2023.03.6 in /opt/anaconda3/lib/python3.13/site-packages (from jsonschema>=4.19.0->chromadb) (2023.7.1)\n",
++      "Requirement already satisfied: referencing>=0.28.4 in /opt/anaconda3/lib/python3.13/site-packages (from jsonschema>=4.19.0->chromadb) (0.30.2)\n",
++      "Requirement already satisfied: rpds-py>=0.7.1 in /opt/anaconda3/lib/python3.13/site-packages (from jsonschema>=4.19.0->chromadb) (0.22.3)\n",
++      "Requirement already satisfied: six>=1.9.0 in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (1.17.0)\n",
++      "Requirement already satisfied: python-dateutil>=2.5.3 in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (2.9.0.post0)\n",
++      "Requirement already satisfied: websocket-client!=0.40.0,!=0.41.*,!=0.42.*,>=0.32.0 in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (1.8.0)\n",
++      "Requirement already satisfied: requests-oauthlib in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (2.0.0)\n",
++      "Requirement already satisfied: durationpy>=0.7 in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (0.10)\n",
++      "Requirement already satisfied: aiohttp<4.0.0,>=3.13.5 in /opt/anaconda3/lib/python3.13/site-packages (from kubernetes>=28.1.0->chromadb) (3.14.1)\n",
++      "Requirement already satisfied: aiohappyeyeballs>=2.5.0 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.13.5->kubernetes>=28.1.0->chromadb) (2.6.2)\n",
++      "Requirement already satisfied: aiosignal>=1.4.0 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.13.5->kubernetes>=28.1.0->chromadb) (1.4.0)\n",
++      "Requirement already satisfied: frozenlist>=1.1.1 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.13.5->kubernetes>=28.1.0->chromadb) (1.5.0)\n",
++      "Requirement already satisfied: multidict<7.0,>=4.5 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.13.5->kubernetes>=28.1.0->chromadb) (6.1.0)\n",
++      "Requirement already satisfied: propcache>=0.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.13.5->kubernetes>=28.1.0->chromadb) (0.3.1)\n",
++      "Requirement already satisfied: yarl<2.0,>=1.17.0 in /opt/anaconda3/lib/python3.13/site-packages (from aiohttp<4.0.0,>=3.13.5->kubernetes>=28.1.0->chromadb) (1.18.0)\n",
++      "Requirement already satisfied: flatbuffers in /opt/anaconda3/lib/python3.13/site-packages (from onnxruntime>=1.14.1->chromadb) (25.12.19)\n",
++      "Requirement already satisfied: protobuf in /opt/anaconda3/lib/python3.13/site-packages (from onnxruntime>=1.14.1->chromadb) (5.29.3)\n",
++      "Requirement already satisfied: googleapis-common-protos~=1.57 in /opt/anaconda3/lib/python3.13/site-packages (from opentelemetry-exporter-otlp-proto-grpc>=1.2.0->chromadb) (1.75.0)\n",
++      "Requirement already satisfied: opentelemetry-exporter-otlp-proto-common==1.42.1 in /opt/anaconda3/lib/python3.13/site-packages (from opentelemetry-exporter-otlp-proto-grpc>=1.2.0->chromadb) (1.42.1)\n",
++      "Requirement already satisfied: opentelemetry-proto==1.42.1 in /opt/anaconda3/lib/python3.13/site-packages (from opentelemetry-exporter-otlp-proto-grpc>=1.2.0->chromadb) (1.42.1)\n",
++      "Requirement already satisfied: opentelemetry-semantic-conventions==0.63b1 in /opt/anaconda3/lib/python3.13/site-packages (from opentelemetry-sdk>=1.2.0->chromadb) (0.63b1)\n",
++      "Requirement already satisfied: python-dotenv>=0.21.0 in /opt/anaconda3/lib/python3.13/site-packages (from pydantic-settings>=2.0->chromadb) (1.1.0)\n",
++      "Requirement already satisfied: markdown-it-py>=2.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from rich>=10.11.0->chromadb) (2.2.0)\n",
++      "Requirement already satisfied: pygments<3.0.0,>=2.13.0 in /opt/anaconda3/lib/python3.13/site-packages (from rich>=10.11.0->chromadb) (2.19.1)\n",
++      "Requirement already satisfied: mdurl~=0.1 in /opt/anaconda3/lib/python3.13/site-packages (from markdown-it-py>=2.2.0->rich>=10.11.0->chromadb) (0.1.0)\n",
++      "Requirement already satisfied: huggingface-hub<2.0,>=0.16.4 in /opt/anaconda3/lib/python3.13/site-packages (from tokenizers>=0.13.2->chromadb) (1.18.0)\n",
++      "Requirement already satisfied: click>=8.4.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.13.2->chromadb) (8.4.1)\n",
++      "Requirement already satisfied: filelock>=3.10.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.13.2->chromadb) (3.17.0)\n",
++      "Requirement already satisfied: fsspec>=2023.5.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.13.2->chromadb) (2025.3.2)\n",
++      "Requirement already satisfied: hf-xet<2.0.0,>=1.4.3 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub<2.0,>=0.16.4->tokenizers>=0.13.2->chromadb) (1.5.1)\n",
++      "Requirement already satisfied: shellingham>=1.3.0 in /opt/anaconda3/lib/python3.13/site-packages (from typer>=0.9.0->chromadb) (1.5.0)\n",
++      "Requirement already satisfied: annotated-doc>=0.0.2 in /opt/anaconda3/lib/python3.13/site-packages (from typer>=0.9.0->chromadb) (0.0.4)\n",
++      "Requirement already satisfied: httptools>=0.6.3 in /opt/anaconda3/lib/python3.13/site-packages (from uvicorn[standard]>=0.18.3->chromadb) (0.7.1)\n",
++      "Requirement already satisfied: uvloop>=0.15.1 in /opt/anaconda3/lib/python3.13/site-packages (from uvicorn[standard]>=0.18.3->chromadb) (0.22.1)\n",
++      "Requirement already satisfied: watchfiles>=0.13 in /opt/anaconda3/lib/python3.13/site-packages (from uvicorn[standard]>=0.18.3->chromadb) (1.1.1)\n",
++      "Requirement already satisfied: websockets>=10.4 in /opt/anaconda3/lib/python3.13/site-packages (from uvicorn[standard]>=0.18.3->chromadb) (15.0.1)\n",
++      "Requirement already satisfied: sniffio>=1.1 in /opt/anaconda3/lib/python3.13/site-packages (from anyio->httpx>=0.25.2->langgraph-sdk<0.3.0,>=0.2.2->langgraph<1.1.0,>=1.0.0->langchain) (1.3.0)\n",
++      "Requirement already satisfied: oauthlib>=3.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from requests-oauthlib->kubernetes>=28.1.0->chromadb) (3.3.1)\n",
++      "\n",
++      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m A new release of pip is available: \u001b[0m\u001b[31;49m25.3\u001b[0m\u001b[39;49m -> \u001b[0m\u001b[32;49m26.1.2\u001b[0m\n",
++      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m To update, run: \u001b[0m\u001b[32;49mpip install --upgrade pip\u001b[0m\n",
++      "Note: you may need to restart the kernel to use updated packages.\n"
++     ]
++    }
++   ],
++   "source": [
++    "pip install langchain chromadb"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 8,
++   "id": "d85c44fa",
++   "metadata": {},
++   "outputs": [
++    {
++     "name": "stderr",
++     "output_type": "stream",
++     "text": [
++      "/var/folders/hy/tg467c916lzckn_372ls6ksr0000gp/T/ipykernel_78252/2411680794.py:2: DeprecationWarning: `langchain-community` is being sunset and is no longer actively maintained. See https://github.com/langchain-ai/langchain-community/issues/674 for details and migration guidance toward standalone integration packages.\n",
++      "  from langchain_community.vectorstores import Chroma\n"
++     ]
++    }
++   ],
++   "source": [
++    "from langchain_huggingface import HuggingFaceEmbeddings\n",
++    "from langchain_community.vectorstores import Chroma"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 9,
++   "id": "86bf341e",
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "from langchain_core.documents import Document\n",
++    "\n",
++    "# Create Langchain documents for IPL players\n",
++    "doc1 = Document(\n",
++    "        page_content=\"Virat Kohli is one of the most successful and consistent batsmen in IPL history. Known for his aggressive batting style and fitness, he has led the Royal Challengers Bangalore in multiple seasons.\",\n",
++    "        metadata={\"team\": \"Royal Challengers Bangalore\"}\n",
++    "    )\n",
++    "doc2 = Document(\n",
++    "        page_content=\"Rohit Sharma is the most successful captain in IPL history, leading Mumbai Indians to five titles. He's known for his calm demeanor and ability to play big innings under pressure.\",\n",
++    "        metadata={\"team\": \"Mumbai Indians\"}\n",
++    "    )\n",
++    "doc3 = Document(\n",
++    "        page_content=\"MS Dhoni, famously known as Captain Cool, has led Chennai Super Kings to multiple IPL titles. His finishing skills, wicketkeeping, and leadership are legendary.\",\n",
++    "        metadata={\"team\": \"Chennai Super Kings\"}\n",
++    "    )\n",
++    "doc4 = Document(\n",
++    "        page_content=\"Jasprit Bumrah is considered one of the best fast bowlers in T20 cricket. Playing for Mumbai Indians, he is known for his yorkers and death-over expertise.\",\n",
++    "        metadata={\"team\": \"Mumbai Indians\"}\n",
++    "    )\n",
++    "doc5 = Document(\n",
++    "        page_content=\"Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.\",\n",
++    "        metadata={\"team\": \"Chennai Super Kings\"}\n",
++    "    )"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 10,
++   "id": "17bed56a",
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "docs = [doc1 , doc2 , doc3 , doc4 , doc5]"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 11,
++   "id": "f2c5c47d",
++   "metadata": {},
++   "outputs": [
++    {
++     "name": "stdout",
++     "output_type": "stream",
++     "text": [
++      "Requirement already satisfied: sentence-transformers in /opt/anaconda3/lib/python3.13/site-packages (5.5.1)\n",
++      "Requirement already satisfied: transformers<6.0.0,>=4.41.0 in /opt/anaconda3/lib/python3.13/site-packages (from sentence-transformers) (5.11.0)\n",
++      "Requirement already satisfied: huggingface-hub>=0.23.0 in /opt/anaconda3/lib/python3.13/site-packages (from sentence-transformers) (1.18.0)\n",
++      "Requirement already satisfied: torch>=1.11.0 in /opt/anaconda3/lib/python3.13/site-packages (from sentence-transformers) (2.9.0)\n",
++      "Requirement already satisfied: numpy>=1.20.0 in /opt/anaconda3/lib/python3.13/site-packages (from sentence-transformers) (2.2.6)\n",
++      "Requirement already satisfied: scikit-learn>=0.22.0 in /opt/anaconda3/lib/python3.13/site-packages (from sentence-transformers) (1.6.1)\n",
++      "Requirement already satisfied: scipy>=1.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from sentence-transformers) (1.15.3)\n",
++      "Requirement already satisfied: typing_extensions>=4.5.0 in /opt/anaconda3/lib/python3.13/site-packages (from sentence-transformers) (4.15.0)\n",
++      "Requirement already satisfied: tqdm>=4.0.0 in /opt/anaconda3/lib/python3.13/site-packages (from sentence-transformers) (4.67.1)\n",
++      "Requirement already satisfied: packaging>=20.0 in /opt/anaconda3/lib/python3.13/site-packages (from transformers<6.0.0,>=4.41.0->sentence-transformers) (24.2)\n",
++      "Requirement already satisfied: pyyaml>=5.1 in /opt/anaconda3/lib/python3.13/site-packages (from transformers<6.0.0,>=4.41.0->sentence-transformers) (6.0.3)\n",
++      "Requirement already satisfied: regex>=2025.10.22 in /opt/anaconda3/lib/python3.13/site-packages (from transformers<6.0.0,>=4.41.0->sentence-transformers) (2025.10.23)\n",
++      "Requirement already satisfied: tokenizers<=0.23.0,>=0.22.0 in /opt/anaconda3/lib/python3.13/site-packages (from transformers<6.0.0,>=4.41.0->sentence-transformers) (0.22.2)\n",
++      "Requirement already satisfied: typer in /opt/anaconda3/lib/python3.13/site-packages (from transformers<6.0.0,>=4.41.0->sentence-transformers) (0.25.1)\n",
++      "Requirement already satisfied: safetensors>=0.4.3 in /opt/anaconda3/lib/python3.13/site-packages (from transformers<6.0.0,>=4.41.0->sentence-transformers) (0.8.0)\n",
++      "Requirement already satisfied: click>=8.4.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub>=0.23.0->sentence-transformers) (8.4.1)\n",
++      "Requirement already satisfied: filelock>=3.10.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub>=0.23.0->sentence-transformers) (3.17.0)\n",
++      "Requirement already satisfied: fsspec>=2023.5.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub>=0.23.0->sentence-transformers) (2025.3.2)\n",
++      "Requirement already satisfied: hf-xet<2.0.0,>=1.4.3 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub>=0.23.0->sentence-transformers) (1.5.1)\n",
++      "Requirement already satisfied: httpx<1,>=0.23.0 in /opt/anaconda3/lib/python3.13/site-packages (from huggingface-hub>=0.23.0->sentence-transformers) (0.28.1)\n",
++      "Requirement already satisfied: anyio in /opt/anaconda3/lib/python3.13/site-packages (from httpx<1,>=0.23.0->huggingface-hub>=0.23.0->sentence-transformers) (4.7.0)\n",
++      "Requirement already satisfied: certifi in /opt/anaconda3/lib/python3.13/site-packages (from httpx<1,>=0.23.0->huggingface-hub>=0.23.0->sentence-transformers) (2025.10.5)\n",
++      "Requirement already satisfied: httpcore==1.* in /opt/anaconda3/lib/python3.13/site-packages (from httpx<1,>=0.23.0->huggingface-hub>=0.23.0->sentence-transformers) (1.0.9)\n",
++      "Requirement already satisfied: idna in /opt/anaconda3/lib/python3.13/site-packages (from httpx<1,>=0.23.0->huggingface-hub>=0.23.0->sentence-transformers) (3.7)\n",
++      "Requirement already satisfied: h11>=0.16 in /opt/anaconda3/lib/python3.13/site-packages (from httpcore==1.*->httpx<1,>=0.23.0->huggingface-hub>=0.23.0->sentence-transformers) (0.16.0)\n",
++      "Requirement already satisfied: shellingham>=1.3.0 in /opt/anaconda3/lib/python3.13/site-packages (from typer->transformers<6.0.0,>=4.41.0->sentence-transformers) (1.5.0)\n",
++      "Requirement already satisfied: rich>=13.8.0 in /opt/anaconda3/lib/python3.13/site-packages (from typer->transformers<6.0.0,>=4.41.0->sentence-transformers) (13.9.4)\n",
++      "Requirement already satisfied: annotated-doc>=0.0.2 in /opt/anaconda3/lib/python3.13/site-packages (from typer->transformers<6.0.0,>=4.41.0->sentence-transformers) (0.0.4)\n",
++      "Requirement already satisfied: markdown-it-py>=2.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from rich>=13.8.0->typer->transformers<6.0.0,>=4.41.0->sentence-transformers) (2.2.0)\n",
++      "Requirement already satisfied: pygments<3.0.0,>=2.13.0 in /opt/anaconda3/lib/python3.13/site-packages (from rich>=13.8.0->typer->transformers<6.0.0,>=4.41.0->sentence-transformers) (2.19.1)\n",
++      "Requirement already satisfied: mdurl~=0.1 in /opt/anaconda3/lib/python3.13/site-packages (from markdown-it-py>=2.2.0->rich>=13.8.0->typer->transformers<6.0.0,>=4.41.0->sentence-transformers) (0.1.0)\n",
++      "Requirement already satisfied: joblib>=1.2.0 in /opt/anaconda3/lib/python3.13/site-packages (from scikit-learn>=0.22.0->sentence-transformers) (1.4.2)\n",
++      "Requirement already satisfied: threadpoolctl>=3.1.0 in /opt/anaconda3/lib/python3.13/site-packages (from scikit-learn>=0.22.0->sentence-transformers) (3.5.0)\n",
++      "Requirement already satisfied: setuptools in /opt/anaconda3/lib/python3.13/site-packages (from torch>=1.11.0->sentence-transformers) (80.9.0)\n",
++      "Requirement already satisfied: sympy>=1.13.3 in /opt/anaconda3/lib/python3.13/site-packages (from torch>=1.11.0->sentence-transformers) (1.13.3)\n",
++      "Requirement already satisfied: networkx>=2.5.1 in /opt/anaconda3/lib/python3.13/site-packages (from torch>=1.11.0->sentence-transformers) (3.4.2)\n",
++      "Requirement already satisfied: jinja2 in /opt/anaconda3/lib/python3.13/site-packages (from torch>=1.11.0->sentence-transformers) (3.1.6)\n",
++      "Requirement already satisfied: mpmath<1.4,>=1.1.0 in /opt/anaconda3/lib/python3.13/site-packages (from sympy>=1.13.3->torch>=1.11.0->sentence-transformers) (1.3.0)\n",
++      "Requirement already satisfied: sniffio>=1.1 in /opt/anaconda3/lib/python3.13/site-packages (from anyio->httpx<1,>=0.23.0->huggingface-hub>=0.23.0->sentence-transformers) (1.3.0)\n",
++      "Requirement already satisfied: MarkupSafe>=2.0 in /opt/anaconda3/lib/python3.13/site-packages (from jinja2->torch>=1.11.0->sentence-transformers) (3.0.2)\n",
++      "\n",
++      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m A new release of pip is available: \u001b[0m\u001b[31;49m25.3\u001b[0m\u001b[39;49m -> \u001b[0m\u001b[32;49m26.1.2\u001b[0m\n",
++      "\u001b[1m[\u001b[0m\u001b[34;49mnotice\u001b[0m\u001b[1;39;49m]\u001b[0m\u001b[39;49m To update, run: \u001b[0m\u001b[32;49mpip install --upgrade pip\u001b[0m\n",
++      "Note: you may need to restart the kernel to use updated packages.\n"
++     ]
++    }
++   ],
++   "source": [
++    "pip install sentence-transformers"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 12,
++   "id": "5bd31bb6",
++   "metadata": {},
++   "outputs": [
++    {
++     "data": {
++      "application/vnd.jupyter.widget-view+json": {
++       "model_id": "82bc4050680d48ddb885485da4ab6921",
++       "version_major": 2,
++       "version_minor": 0
++      },
++      "text/plain": [
++       "Loading weights:   0%|          | 0/199 [00:00<?, ?it/s]"
++      ]
++     },
++     "metadata": {},
++     "output_type": "display_data"
++    },
++    {
++     "name": "stderr",
++     "output_type": "stream",
++     "text": [
++      "/var/folders/hy/tg467c916lzckn_372ls6ksr0000gp/T/ipykernel_78252/3809462289.py:1: LangChainDeprecationWarning: The class `Chroma` was deprecated in LangChain 0.2.9 and will be removed in 1.0. An updated version of the class exists in the `langchain-chroma package and should be used instead. To use it run `pip install -U `langchain-chroma` and import as `from `langchain_chroma import Chroma``.\n",
++      "  vector_store = Chroma(\n"
++     ]
++    }
++   ],
++   "source": [
++    "vector_store = Chroma(\n",
++    "    embedding_function=HuggingFaceEmbeddings(), \n",
++    "    persist_directory='my_chroma_db', \n",
++    "    collection_name='sample'\n",
++    ") "
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 13,
++   "id": "4c12dafd",
++   "metadata": {},
++   "outputs": [
++    {
++     "data": {
++      "text/plain": [
++       "['d08f532b-99b6-4e91-911f-07d4f2b1c8d0',\n",
++       " '07d62be1-17b5-4ce9-bd05-778522da37ba',\n",
++       " '5169638a-20db-422d-b06e-3fb77a319dba',\n",
++       " 'c53cee24-3c02-44c7-bde0-022edcc7e475',\n",
++       " '9dc72857-80dc-4052-b0b8-b24ff038da5d']"
++      ]
++     },
++     "execution_count": 13,
++     "metadata": {},
++     "output_type": "execute_result"
++    }
++   ],
++   "source": [
++    "# add documents \n",
++    "vector_store.add_documents(docs)"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 14,
++   "id": "1b5e98b8",
++   "metadata": {},
++   "outputs": [
++    {
++     "data": {
++      "text/plain": [
++       "{'ids': ['9a15a73c-e7ca-4c98-bd74-a01af4addc20',\n",
++       "  '6d46b7c8-d333-41ba-93b1-b3612e726ef0',\n",
++       "  '4830d134-b7d8-4121-96df-4dfba8df237d',\n",
++       "  '57602c77-2370-4d8e-9c86-8423f94dfe33',\n",
++       "  'd5a651aa-3f7f-4fa5-bc42-e71eb1f0a6f1',\n",
++       "  'd08f532b-99b6-4e91-911f-07d4f2b1c8d0',\n",
++       "  '07d62be1-17b5-4ce9-bd05-778522da37ba',\n",
++       "  '5169638a-20db-422d-b06e-3fb77a319dba',\n",
++       "  'c53cee24-3c02-44c7-bde0-022edcc7e475',\n",
++       "  '9dc72857-80dc-4052-b0b8-b24ff038da5d'],\n",
++       " 'embeddings': array([[-0.04108334, -0.02528016, -0.0214507 , ...,  0.02231625,\n",
++       "         -0.02287272, -0.00913001],\n",
++       "        [-0.01992603,  0.00161878, -0.00959342, ...,  0.02433116,\n",
++       "         -0.00341396, -0.01722027],\n",
++       "        [-0.04256173,  0.01060321, -0.01305764, ...,  0.04738367,\n",
++       "         -0.01748705,  0.00204667],\n",
++       "        ...,\n",
++       "        [-0.04256173,  0.01060321, -0.01305764, ...,  0.04738367,\n",
++       "         -0.01748705,  0.00204667],\n",
++       "        [-0.02734393, -0.03300872,  0.01565377, ...,  0.01462707,\n",
++       "          0.01177984,  0.00556422],\n",
++       "        [ 0.02301697, -0.02011725, -0.00123579, ...,  0.02533479,\n",
++       "          0.00280533, -0.05120279]], shape=(10, 768)),\n",
++       " 'documents': [\"Virat Kohli, the former captain of Royal Challengers Bangalore (RCB), is renowned for his aggressive leadership and consistent batting performances. He holds the record for the most runs in IPL history, including multiple centuries in a single season. Despite RCB not winning an IPL title under his captaincy, Kohli's passion and fitness set a benchmark for the league. His ability to chase targets and anchor innings has made him one of the most dependable players in T20 cricket.\",\n",
++       "  \"Rohit Sharma is the most successful captain in IPL history, leading Mumbai Indians to five titles. He's known for his calm demeanor and ability to play big innings under pressure.\",\n",
++       "  'MS Dhoni, famously known as Captain Cool, has led Chennai Super Kings to multiple IPL titles. His finishing skills, wicketkeeping, and leadership are legendary.',\n",
++       "  'Jasprit Bumrah is considered one of the best fast bowlers in T20 cricket. Playing for Mumbai Indians, he is known for his yorkers and death-over expertise.',\n",
++       "  'Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.',\n",
++       "  'Virat Kohli is one of the most successful and consistent batsmen in IPL history. Known for his aggressive batting style and fitness, he has led the Royal Challengers Bangalore in multiple seasons.',\n",
++       "  \"Rohit Sharma is the most successful captain in IPL history, leading Mumbai Indians to five titles. He's known for his calm demeanor and ability to play big innings under pressure.\",\n",
++       "  'MS Dhoni, famously known as Captain Cool, has led Chennai Super Kings to multiple IPL titles. His finishing skills, wicketkeeping, and leadership are legendary.',\n",
++       "  'Jasprit Bumrah is considered one of the best fast bowlers in T20 cricket. Playing for Mumbai Indians, he is known for his yorkers and death-over expertise.',\n",
++       "  'Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.'],\n",
++       " 'uris': None,\n",
++       " 'included': ['embeddings', 'documents', 'metadatas'],\n",
++       " 'data': None,\n",
++       " 'metadatas': [{'team': 'Royal Challengers Bangalore'},\n",
++       "  {'team': 'Mumbai Indians'},\n",
++       "  {'team': 'Chennai Super Kings'},\n",
++       "  {'team': 'Mumbai Indians'},\n",
++       "  {'team': 'Chennai Super Kings'},\n",
++       "  {'team': 'Royal Challengers Bangalore'},\n",
++       "  {'team': 'Mumbai Indians'},\n",
++       "  {'team': 'Chennai Super Kings'},\n",
++       "  {'team': 'Mumbai Indians'},\n",
++       "  {'team': 'Chennai Super Kings'}]}"
++      ]
++     },
++     "execution_count": 14,
++     "metadata": {},
++     "output_type": "execute_result"
++    }
++   ],
++   "source": [
++    "# view documents\n",
++    "vector_store.get(include=['embeddings' , 'documents' , 'metadatas'])\n"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 15,
++   "id": "f78000ef",
++   "metadata": {},
++   "outputs": [
++    {
++     "data": {
++      "text/plain": [
++       "[Document(metadata={'team': 'Chennai Super Kings'}, page_content='Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.'),\n",
++       " Document(metadata={'team': 'Chennai Super Kings'}, page_content='Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.')]"
++      ]
++     },
++     "execution_count": 15,
++     "metadata": {},
++     "output_type": "execute_result"
++    }
++   ],
++   "source": [
++    "# search similarity\n",
++    "vector_store.similarity_search(\n",
++    "    query='Who among these are a bowler?' , \n",
++    "    k = 2\n",
++    ")"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 16,
++   "id": "8288d26f",
++   "metadata": {},
++   "outputs": [
++    {
++     "data": {
++      "text/plain": [
++       "[(Document(metadata={'team': 'Chennai Super Kings'}, page_content='Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.'),\n",
++       "  1.2036768198013306),\n",
++       " (Document(metadata={'team': 'Chennai Super Kings'}, page_content='Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.'),\n",
++       "  1.2036768198013306)]"
++      ]
++     },
++     "execution_count": 16,
++     "metadata": {},
++     "output_type": "execute_result"
++    }
++   ],
++   "source": [
++    "# search with similarity score\n",
++    "vector_store.similarity_search_with_score(\n",
++    "    query ='Who among these are a bowler?' , \n",
++    "    k = 2\n",
++    ")"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 17,
++   "id": "312cdd5e",
++   "metadata": {},
++   "outputs": [
++    {
++     "data": {
++      "text/plain": [
++       "[(Document(metadata={'team': 'Chennai Super Kings'}, page_content='MS Dhoni, famously known as Captain Cool, has led Chennai Super Kings to multiple IPL titles. His finishing skills, wicketkeeping, and leadership are legendary.'),\n",
++       "  1.887956976890564),\n",
++       " (Document(metadata={'team': 'Chennai Super Kings'}, page_content='MS Dhoni, famously known as Captain Cool, has led Chennai Super Kings to multiple IPL titles. His finishing skills, wicketkeeping, and leadership are legendary.'),\n",
++       "  1.887956976890564),\n",
++       " (Document(metadata={'team': 'Chennai Super Kings'}, page_content='Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.'),\n",
++       "  2.0017192363739014),\n",
++       " (Document(metadata={'team': 'Chennai Super Kings'}, page_content='Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.'),\n",
++       "  2.0017192363739014)]"
++      ]
++     },
++     "execution_count": 17,
++     "metadata": {},
++     "output_type": "execute_result"
++    }
++   ],
++   "source": [
++    "# metadata filtering\n",
++    "vector_store.similarity_search_with_score(\n",
++    "    query =\"\" , \n",
++    "    filter={\"team\":\"Chennai Super Kings\"}\n",
++    ")"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 18,
++   "id": "76038aab",
++   "metadata": {},
++   "outputs": [],
++   "source": [
++    "# update documents\n",
++    "updated_doc1 = Document(\n",
++    "    page_content=\"Virat Kohli, the former captain of Royal Challengers Bangalore (RCB), is renowned for his aggressive leadership and consistent batting performances. He holds the record for the most runs in IPL history, including multiple centuries in a single season. Despite RCB not winning an IPL title under his captaincy, Kohli's passion and fitness set a benchmark for the league. His ability to chase targets and anchor innings has made him one of the most dependable players in T20 cricket.\",\n",
++    "    metadata={\"team\": \"Royal Challengers Bangalore\"}\n",
++    ")\n",
++    "\n",
++    "vector_store.update_document(document_id='9a15a73c-e7ca-4c98-bd74-a01af4addc20' , document = updated_doc1)"
++   ]
++  },
++  {
++   "cell_type": "code",
++   "execution_count": 19,
++   "id": "a20f4710",
++   "metadata": {},
++   "outputs": [
++    {
++     "data": {
++      "text/plain": [
++       "{'ids': ['9a15a73c-e7ca-4c98-bd74-a01af4addc20',\n",
++       "  '6d46b7c8-d333-41ba-93b1-b3612e726ef0',\n",
++       "  '4830d134-b7d8-4121-96df-4dfba8df237d',\n",
++       "  '57602c77-2370-4d8e-9c86-8423f94dfe33',\n",
++       "  'd5a651aa-3f7f-4fa5-bc42-e71eb1f0a6f1',\n",
++       "  'd08f532b-99b6-4e91-911f-07d4f2b1c8d0',\n",
++       "  '07d62be1-17b5-4ce9-bd05-778522da37ba',\n",
++       "  '5169638a-20db-422d-b06e-3fb77a319dba',\n",
++       "  'c53cee24-3c02-44c7-bde0-022edcc7e475',\n",
++       "  '9dc72857-80dc-4052-b0b8-b24ff038da5d'],\n",
++       " 'embeddings': array([[-0.04108334, -0.02528016, -0.0214507 , ...,  0.02231625,\n",
++       "         -0.02287272, -0.00913001],\n",
++       "        [-0.01992603,  0.00161878, -0.00959342, ...,  0.02433116,\n",
++       "         -0.00341396, -0.01722027],\n",
++       "        [-0.04256173,  0.01060321, -0.01305764, ...,  0.04738367,\n",
++       "         -0.01748705,  0.00204667],\n",
++       "        ...,\n",
++       "        [-0.04256173,  0.01060321, -0.01305764, ...,  0.04738367,\n",
++       "         -0.01748705,  0.00204667],\n",
++       "        [-0.02734393, -0.03300872,  0.01565377, ...,  0.01462707,\n",
++       "          0.01177984,  0.00556422],\n",
++       "        [ 0.02301697, -0.02011725, -0.00123579, ...,  0.02533479,\n",
++       "          0.00280533, -0.05120279]], shape=(10, 768)),\n",
++       " 'documents': [\"Virat Kohli, the former captain of Royal Challengers Bangalore (RCB), is renowned for his aggressive leadership and consistent batting performances. He holds the record for the most runs in IPL history, including multiple centuries in a single season. Despite RCB not winning an IPL title under his captaincy, Kohli's passion and fitness set a benchmark for the league. His ability to chase targets and anchor innings has made him one of the most dependable players in T20 cricket.\",\n",
++       "  \"Rohit Sharma is the most successful captain in IPL history, leading Mumbai Indians to five titles. He's known for his calm demeanor and ability to play big innings under pressure.\",\n",
++       "  'MS Dhoni, famously known as Captain Cool, has led Chennai Super Kings to multiple IPL titles. His finishing skills, wicketkeeping, and leadership are legendary.',\n",
++       "  'Jasprit Bumrah is considered one of the best fast bowlers in T20 cricket. Playing for Mumbai Indians, he is known for his yorkers and death-over expertise.',\n",
++       "  'Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.',\n",
++       "  'Virat Kohli is one of the most successful and consistent batsmen in IPL history. Known for his aggressive batting style and fitness, he has led the Royal Challengers Bangalore in multiple seasons.',\n",
++       "  \"Rohit Sharma is the most successful captain in IPL history, leading Mumbai Indians to five titles. He's known for his calm demeanor and ability to play big innings under pressure.\",\n",
++       "  'MS Dhoni, famously known as Captain Cool, has led Chennai Super Kings to multiple IPL titles. His finishing skills, wicketkeeping, and leadership are legendary.',\n",
++       "  'Jasprit Bumrah is considered one of the best fast bowlers in T20 cricket. Playing for Mumbai Indians, he is known for his yorkers and death-over expertise.',\n",
++       "  'Ravindra Jadeja is a dynamic all-rounder who contributes with both bat and ball. Representing Chennai Super Kings, his quick fielding and match-winning performances make him a key player.'],\n",
++       " 'uris': None,\n",
++       " 'included': ['embeddings', 'documents', 'metadatas'],\n",
++       " 'data': None,\n",
++       " 'metadatas': [{'team': 'Royal Challengers Bangalore'},\n",
++       "  {'team': 'Mumbai Indians'},\n",
++       "  {'team': 'Chennai Super Kings'},\n",
++       "  {'team': 'Mumbai Indians'},\n",
++       "  {'team': 'Chennai Super Kings'},\n",
++       "  {'team': 'Royal Challengers Bangalore'},\n",
++       "  {'team': 'Mumbai Indians'},\n",
++       "  {'team': 'Chennai Super Kings'},\n",
++       "  {'team': 'Mumbai Indians'},\n",
++       "  {'team': 'Chennai Super Kings'}]}"
++      ]
++     },
++     "execution_count": 19,
++     "metadata": {},
++     "output_type": "execute_result"
++    }
++   ],
++   "source": [
++    "# view documents\n",
++    "vector_store.get(include=['embeddings' , 'documents' , 'metadatas'])"
++   ]
++  }
++ ],
++ "metadata": {
++  "kernelspec": {
++   "display_name": "base",
++   "language": "python",
++   "name": "python3"
++  },
++  "language_info": {
++   "codemirror_mode": {
++    "name": "ipython",
++    "version": 3
++   },
++   "file_extension": ".py",
++   "mimetype": "text/x-python",
++   "name": "python",
++   "nbconvert_exporter": "python",
++   "pygments_lexer": "ipython3",
++   "version": "3.13.5"
++  }
++ },
++ "nbformat": 4,
++ "nbformat_minor": 5
++}
+diff --git a/README.md b/README.md
+index 6e44212..bd76bf1 100644
+--- a/README.md
++++ b/README.md
+@@ -4,32 +4,6 @@
+ 
+ ---
+ 
+-## 📁 Suggested Repo Names
+-
+-Pick any of these for your GitHub repo:
+-
+-```
+-llm-mastery-roadmap
+-from-transformers-to-agents
+-llm-rag-agents-handbook
+-generative-ai-deep-dive
+-llm-engineering-notes
+-llm-to-production
+-the-llm-playbook
+-genai-from-scratch
+-```
+-
+-> **Recommended:** `llm-mastery-roadmap` or `llm-engineering-notes` — clear, professional, searchable.
+-
+----
+-
+-## ✅ Am I Ready for Advanced LLMs?
+-
+-**Yes. Fully.** With ML + DL + NLP + Transformers done, you have the strongest foundation possible.
+-Most people jump into LLMs without any of this — you're ahead of 90% of learners.
+-
+----
+-
+ ## 🗺️ The Full Learning Path
+ 
+ ```
